@@ -1,0 +1,85 @@
+---
+title: "week4_project"
+output: html_document
+---
+##Practical Machine Learning - Prediction Assignment
+
+###Goal of the assignment
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+####Training and test data set 
+The training data used for the project is: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv The test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har
+
+After cleaning the data, I have decided to go with RF with PCA. For cross validation I have applied a 70 / 30 split.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###loading train & test data
+```{r}
+library(caret)
+library(e1071)
+library(randomForest)
+training <- read.table("pml-training.csv", header = TRUE, sep=',', na.strings=c('#DIV/0!', '', 'NA'))
+testing <- read.table("pml-testing.csv", header = TRUE, sep=',', na.strings=c('#DIV/0!', '', 'NA'))
+```
+
+####removing n/a in test and train data
+```{r}
+dftraining<-training[, colSums(is.na(training))==0]
+dftesting<-testing[, colSums(is.na(testing))==0]
+```
+
+####removing time stamp data from training & testing data
+```{r}
+dftraining<-subset(dftraining,select=c(8:60))
+dftesting<-subset(dftesting,select=c(8:60))
+```
+
+####dividing data into training and validation data
+```{r}
+inTrain<-createDataPartition(y = dftraining$classe, p = 0.7, list = FALSE)
+training<-dftraining[inTrain,]
+validation<-dftraining[-inTrain,]
+```
+
+####preprocessing data with PCA
+```{r}
+preProc<- preProcess(training[, -53], method = "pca", thresh = 0.99)
+trainPC<-predict(preProc,training[,-53])
+validPC<-predict(preProc,validation[,-53])
+```
+
+####training the model
+```{r}
+modelFit<-randomForest(training$classe ~.,data=trainPC,importance=TRUE)
+print(modelFit)
+```
+
+####validating result 
+```{r}
+pred_valid<-predict(modelFit,validPC)
+confusion<-confusionMatrix(validation$classe,pred_valid)
+confusion$table
+```
+
+```{r}
+accur<- postResample(validation$classe, pred_valid)
+accur
+```
+
+```{r}
+outSamperror<-1-accur[[1]]
+outSamperror 
+```
+
+####running model on test data
+```{r}
+testPC <- predict(preProc, dftesting[,-53])
+pred_test <- predict(modelFit, testPC)
+pred_test
+```
+
+
